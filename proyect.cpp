@@ -1,272 +1,226 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <math.h>   
+#include <cmath>
 
 using namespace std;
 
-const int MAX_ANCHO = 256;
-const int MAX_ALTO = 256;
+const int ANCHO_MAX = 256;
+const int ALTO_MAX = 256;
 const int MAX_CIRCULOS = 32;
 
 struct Circulo {
     int color;
-
-    int minX, maxX;
-    int minY, maxY;
-
-
-    int centroX, centroY;
+    int min_x, max_x;
+    int min_y, max_y;
+    int centro_x, centro_y;
     int diametro;
     int radio;
-    int circunferencia; 
-
+    int perimetro;
     double pi_local;
     int area_normalizada;
 };
 
 int N, M, T;
 int ancho, alto, max_gris;
-int imagen[MAX_ALTO][MAX_ANCHO];
-bool visitado[MAX_ALTO][MAX_ANCHO];       
+int imagen[ALTO_MAX][ANCHO_MAX];
+bool visitado[ALTO_MAX][ANCHO_MAX];
 Circulo lista[MAX_CIRCULOS];
-int total_encontrados = 0;   
+int total_encontrados = 0;
 
-bool mejorSeleccion[MAX_CIRCULOS];
-int sumaMaxima = 0;
-int menorDiferencia = 9999999;
+bool mejor_seleccion[MAX_CIRCULOS];
+int suma_mejor = 0;
+int menor_diferencia = 9999999;
 
-
-
-void cargarImagen(string nombreArchivo) {
-    ifstream archivo(nombreArchivo.c_str());
-
+void cargarImagen(const string &nombreArchivo) {
+    ifstream in(nombreArchivo.c_str());
     string cabecera;
-    archivo >> cabecera; 
-    archivo >> ancho >> alto >> max_gris;
-
-    for (int i = 0; i < alto; i++) {
-        for (int j = 0; j < ancho; j++) {
-            archivo >> imagen[i][j];
+    in >> cabecera;
+    in >> ancho >> alto >> max_gris;
+    for (int r = 0; r < alto; ++r) {
+        for (int c = 0; c < ancho; ++c) {
+            in >> imagen[r][c];
         }
     }
-    archivo.close();
+    in.close();
 }
 
-void Ver_vecinos(int x, int y, int colorBuscado, int i) {
-    
+void verVecinos(int x, int y, int colorBuscado, int idx) {
     if (x < 0 || x >= ancho || y < 0 || y >= alto) return;
-
     if (visitado[y][x]) return;
     if (imagen[y][x] != colorBuscado) return;
 
     visitado[y][x] = true;
 
-    if (x < lista[i].minX) lista[i].minX = x;
-    if (x > lista[i].maxX) lista[i].maxX = x;
-    if (y < lista[i].minY) lista[i].minY = y;
-    if (y > lista[i].maxY) lista[i].maxY = y;
+    if (x < lista[idx].min_x) lista[idx].min_x = x;
+    if (x > lista[idx].max_x) lista[idx].max_x = x;
+    if (y < lista[idx].min_y) lista[idx].min_y = y;
+    if (y > lista[idx].max_y) lista[idx].max_y = y;
 
-    Ver_vecinos(x + 1, y, colorBuscado, i); 
-    Ver_vecinos(x - 1, y, colorBuscado, i); 
-    Ver_vecinos(x, y + 1, colorBuscado, i); 
-    Ver_vecinos(x, y - 1, colorBuscado, i); 
+    verVecinos(x + 1, y, colorBuscado, idx);
+    verVecinos(x - 1, y, colorBuscado, idx);
+    verVecinos(x, y + 1, colorBuscado, idx);
+    verVecinos(x, y - 1, colorBuscado, idx);
 }
 
 void procesarImagen() {
-
-    for (int i = 0; i < alto; i++)
-        for (int j = 0; j < ancho; j++)
-            visitado[i][j] = false;
+    for (int r = 0; r < alto; ++r)
+        for (int c = 0; c < ancho; ++c)
+            visitado[r][c] = false;
 
     total_encontrados = 0;
-    int fondo = 0; 
+    int fondo = 0;
 
-    for (int y = 0; y < alto; y++) {
-        for (int x = 0; x < ancho; x++) {
-            int colorActual = imagen[y][x];
-
-            if (colorActual != fondo && !visitado[y][x]) {
-
+    for (int y = 0; y < alto; ++y) {
+        for (int x = 0; x < ancho; ++x) {
+            int col = imagen[y][x];
+            if (col != fondo && !visitado[y][x]) {
                 if (total_encontrados >= MAX_CIRCULOS) break;
 
-                lista[total_encontrados].color = colorActual;
-                lista[total_encontrados].minX = MAX_ANCHO;
-                lista[total_encontrados].maxX = -1;
-                lista[total_encontrados].minY = MAX_ALTO;
-                lista[total_encontrados].maxY = -1;
+                lista[total_encontrados].color = col;
+                lista[total_encontrados].min_x = ANCHO_MAX;
+                lista[total_encontrados].max_x = -1;
+                lista[total_encontrados].min_y = ALTO_MAX;
+                lista[total_encontrados].max_y = -1;
 
-                Ver_vecinos(x, y, colorActual, total_encontrados);
-
+                verVecinos(x, y, col, total_encontrados);
                 total_encontrados++;
             }
         }
     }
 }
 
+void calcularMedidas() {
+    double sumaPi = 0.0;
+    for (int i = 0; i < total_encontrados; ++i) {
+        Circulo &c = lista[i];
+        c.centro_x = (c.min_x + c.max_x) / 2;
+        c.centro_y = (c.min_y + c.max_y) / 2;
 
+        int w = c.max_x - c.min_x + 1;
+        int h = c.max_y - c.min_y + 1;
+        c.diametro = (w > h) ? w : h;
+        c.radio = (c.diametro / 2) + 1;
 
-void calcularDatos() {
-    double sumaTotalPi = 0.0;
+        c.perimetro = 0;
+        for (int y = c.min_y; y <= c.max_y; ++y) {
+            for (int x = c.min_x; x <= c.max_x; ++x) {
+                if (imagen[y][x] == c.color) {
+                    bool borde = false;
+                    if (x == 0 || x == ancho - 1 || y == 0 || y == alto - 1) borde = true;
+                    else if (imagen[y][x - 1] != c.color) borde = true;
+                    else if (imagen[y][x + 1] != c.color) borde = true;
+                    else if (imagen[y - 1][x] != c.color) borde = true;
+                    else if (imagen[y + 1][x] != c.color) borde = true;
 
-    for (int i = 0; i < total_encontrados; i++) {
-        Circulo& circuloActual = lista[i];
-
-        circuloActual.centroX = (circuloActual.minX + circuloActual.maxX) / 2;
-        circuloActual.centroY = (circuloActual.minY + circuloActual.maxY) / 2;
-
-        int w = circuloActual.maxX - circuloActual.minX + 1;
-        int h = circuloActual.maxY - circuloActual.minY + 1;
-
-        circuloActual.diametro = (w > h) ? w : h;
-        circuloActual.radio = (circuloActual.diametro / 2) + 1;
-
-        circuloActual.circunferencia = 0;
-        for (int y = circuloActual.minY; y <= circuloActual.maxY; y++) {
-            for (int x = circuloActual.minX; x <= circuloActual.maxX; x++) {
-                if (imagen[y][x] == circuloActual.color) {
-                    bool esBorde = false;
-
-                    if (x == 0 || x == ancho - 1 || y == 0 || y == alto - 1) esBorde = true;
-                    else if (imagen[y][x - 1] != circuloActual.color) esBorde = true;
-                    else if (imagen[y][x + 1] != circuloActual.color) esBorde = true;
-                    else if (imagen[y - 1][x] != circuloActual.color) esBorde = true;
-                    else if (imagen[y + 1][x] != circuloActual.color) esBorde = true;
-
-                    if (esBorde) circuloActual.circunferencia++;
+                    if (borde) c.perimetro++;
                 }
             }
         }
 
-        if (circuloActual.diametro > 0)
-            circuloActual.pi_local = (double)circuloActual.circunferencia / (double)circuloActual.diametro;
-        else
-            circuloActual.pi_local = 0;
+        if (c.diametro > 0) c.pi_local = (double)c.perimetro / (double)c.diametro;
+        else c.pi_local = 0.0;
 
-        sumaTotalPi = sumaTotalPi+ circuloActual.pi_local;
+        sumaPi += c.pi_local;
     }
 
-    double pi_promedio = 0;
-    if (total_encontrados > 0)
-        pi_promedio = sumaTotalPi / total_encontrados;
+    double pi_promedio = 0.0;
+    if (total_encontrados > 0) pi_promedio = sumaPi / total_encontrados;
 
-    for (int i = 0; i < total_encontrados; i++) {
+    for (int i = 0; i < total_encontrados; ++i) {
         double areaExacta = pi_promedio * (double)(lista[i].radio * lista[i].radio);
-        lista[i].area_normalizada = (int)ceil(areaExacta); 
+        lista[i].area_normalizada = (int)ceil(areaExacta);
     }
 }
 
 void ordenarPorColor() {
-   
-    for (int i = 0; i < total_encontrados - 1; i++) {
-        for (int j = 0; j < total_encontrados - i - 1; j++) {
+    for (int i = 0; i < total_encontrados - 1; ++i) {
+        for (int j = 0; j < total_encontrados - i - 1; ++j) {
             if (lista[j].color > lista[j + 1].color) {
-                Circulo temp = lista[j];
+                Circulo tmp = lista[j];
                 lista[j] = lista[j + 1];
-                lista[j + 1] = temp;
+                lista[j + 1] = tmp;
             }
         }
     }
 }
 
-
-
-void buscarMejorSuma(int i, int sumaActual, bool seleccionActual[]) {
-
+void buscarMejorSuma(int idx, int sumaActual, bool seleccion[]) {
     if (sumaActual > T) return;
 
-    
     int diferencia = T - sumaActual;
-    if (diferencia < menorDiferencia) {
-        menorDiferencia = diferencia;
-        sumaMaxima = sumaActual;
-
-        for (int k = 0; k < M; k++) {
-            mejorSeleccion[k] = seleccionActual[k];
-        }
+    if (diferencia < menor_diferencia) {
+        menor_diferencia = diferencia;
+        suma_mejor = sumaActual;
+        for (int k = 0; k < M; ++k) mejor_seleccion[k] = seleccion[k];
     }
 
-    if (i == M) return;
+    if (idx == M) return;
 
-    seleccionActual[i] = true;
-    buscarMejorSuma(i + 1, sumaActual + lista[i].area_normalizada, seleccionActual);
-
-    seleccionActual[i] = false;
-    buscarMejorSuma(i + 1, sumaActual, seleccionActual);
+    seleccion[idx] = true;
+    buscarMejorSuma(idx + 1, sumaActual + lista[idx].area_normalizada, seleccion);
+    seleccion[idx] = false;
+    buscarMejorSuma(idx + 1, sumaActual, seleccion);
 }
 
-void ArchivoSalida(string nombre) {
-    ofstream archivo(nombre.c_str());
-    if (!archivo.is_open()) return;
+void escribirSalida(const string &nombre) {
+    ofstream out(nombre.c_str());
+    if (!out.is_open()) return;
+    out << "P2" << endl;
+    out << ancho << " " << alto << endl;
+    out << max_gris << endl;
 
-    archivo << "P2" << endl;
-    archivo << ancho << " " << alto << endl;
-    archivo << max_gris << endl;
-
-    for (int y = 0; y < alto; y++) {
-        for (int x = 0; x < ancho; x++) {
-            int valorPixel = 0; 
-
-            for (int k = 0; k < total_encontrados; k++) {
-                Circulo& c = lista[k];
-
-                if (x == c.centroX && y == c.centroY) {
-                    valorPixel = max_gris;
-                    break;
-                }
-
-                if (x >= c.minX && x <= c.maxX && y >= c.minY && y <= c.maxY) {
+    for (int y = 0; y < alto; ++y) {
+        for (int x = 0; x < ancho; ++x) {
+            int valor = 0;
+            for (int k = 0; k < total_encontrados; ++k) {
+                Circulo &c = lista[k];
+                if (x == c.centro_x && y == c.centro_y) { valor = max_gris; break; }
+                if (x >= c.min_x && x <= c.max_x && y >= c.min_y && y <= c.max_y) {
                     if (imagen[y][x] == c.color) {
-  
-                        bool esBorde = false;
-                        if (x == 0 || x == ancho - 1 || y == 0 || y == alto - 1) esBorde = true;
-                        else if (imagen[y][x - 1] != c.color) esBorde = true;
-                        else if (imagen[y][x + 1] != c.color) esBorde = true;
-                        else if (imagen[y - 1][x] != c.color) esBorde = true;
-                        else if (imagen[y + 1][x] != c.color) esBorde = true;
+                        bool borde = false;
+                        if (x == 0 || x == ancho - 1 || y == 0 || y == alto - 1) borde = true;
+                        else if (imagen[y][x - 1] != c.color) borde = true;
+                        else if (imagen[y][x + 1] != c.color) borde = true;
+                        else if (imagen[y - 1][x] != c.color) borde = true;
+                        else if (imagen[y + 1][x] != c.color) borde = true;
 
-                        if (esBorde) {
-                            valorPixel = c.color;
-                        }
+                        if (borde) valor = c.color;
                     }
                 }
             }
-            archivo << valorPixel << (x == ancho - 1 ? "" : " ");
+            out << valor << (x == ancho - 1 ? "" : " ");
         }
-        archivo << endl;
+        out << endl;
     }
-    archivo.close();
+    out.close();
 }
 
 int main() {
-    
-    cin>>N; 
-    cin>>M; 
-    cin>>T;
+    cin >> N;
+    cin >> M;
+    cin >> T;
 
-    string nombreArchivo = "objectives" + to_string(N) + ".pgm";
-    cargarImagen(nombreArchivo);
+    string archivo = "objectives" + to_string(N) + ".pgm";
+    cargarImagen(archivo);
 
     procesarImagen();
-    
-    if (total_encontrados != M) {
-        M = total_encontrados;
-    }
+    if (total_encontrados != M) M = total_encontrados;
 
-    calcularDatos();
+    calcularMedidas();
     ordenarPorColor();
 
-    for (int i = 0; i < M; i++) {
+    for (int i = 0; i < M; ++i) {
         cout << lista[i].area_normalizada << "u" << endl;
     }
     cout << endl;
 
-    bool seleccionTemp[MAX_CIRCULOS] = { false };
-    buscarMejorSuma(0, 0, seleccionTemp);
+    bool selTemp[MAX_CIRCULOS] = { false };
+    buscarMejorSuma(0, 0, selTemp);
 
     bool primero = true;
-    for (int i = 0; i < M; i++) {
-        if (mejorSeleccion[i]) {
+    for (int i = 0; i < M; ++i) {
+        if (mejor_seleccion[i]) {
             if (!primero) cout << ", ";
             cout << "Circulo" << (i + 1);
             primero = false;
@@ -274,7 +228,6 @@ int main() {
     }
     cout << endl;
 
-    ArchivoSalida("sites.pgm");
-
+    escribirSalida("sites.pgm");
     return 0;
 }
