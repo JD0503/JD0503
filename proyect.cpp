@@ -2,7 +2,7 @@
 #include <fstream>
 #include <string>
 #include <math.h>   
-//goat
+
 using namespace std;
 
 const int MAX_ANCHO = 256;
@@ -43,7 +43,8 @@ void cargarImagen(string nombreArchivo) {
 
     string cabecera;
     archivo >> cabecera; 
-    archivo >> ancho >> alto >> max_gris;
+    archivo >> ancho >> alto;
+    archivo >> max_gris;
 
     for (int i = 0; i < alto; i++) {
         for (int j = 0; j < ancho; j++) {
@@ -118,7 +119,12 @@ void calcularDatos() {
         int w = circuloActual.maxX - circuloActual.minX + 1;
         int h = circuloActual.maxY - circuloActual.minY + 1;
 
-        circuloActual.diametro = (w > h) ? w : h;
+        if(w > h){
+            circuloActual.diametro = w;
+        } else {
+            circuloActual.diametro = h;
+        }
+
         circuloActual.radio = (circuloActual.diametro / 2) + 1;
 
         circuloActual.circunferencia = 0;
